@@ -12,8 +12,11 @@ const map = new mapboxgl.Map({
   style: "mapbox://styles/mapbox/dark-v9",
   center: origin,
   pitch: 45,
-  zoom: 2
+  zoom: 10
 });
+var destination, line;
+		var soldier;
+
 map.addControl(new mapboxgl.NavigationControl());
 var lines = new Array();
     lines.push([139.6503, 35.6762, 80000]);
@@ -33,7 +36,7 @@ map.on("style.load", function () {
     type: "gltf",
     obj:
       "assets/scene.gltf",
-    scale: 5,
+    scale: .1,
     units: "scene",
     anchor: "center",
     rotation: { x: 90, y: 90, z: 0 }
@@ -88,7 +91,63 @@ map.on("style.load", function () {
           tb.update();
         },
       });
-    });
+    })
+    .on('click', function (e) {
+			var pt = [e.lngLat.lng, e.lngLat.lat];
+			travelPath(pt);
+		})
+
+		function travelPath(destination) {
+
+			// request directions. See https://docs.mapbox.com/api/navigation/#directions for details
+
+			var url = "https://api.mapbox.com/directions/v5/mapbox/driving/" + [origin, destination].join(';') + "?geometries=geojson&access_token=" + 'pk.eyJ1IjoiZXZhbmRlbGJlY3EiLCJhIjoiY2wyeWxnMnplMDNmbjNqcW80OXo5ZjR4NyJ9.b9tdFTYQ13LuscLgGq0v2A'
+      
+
+
+			fetchFunction(url, function (data) {
+
+				let duration = 10000;
+				// extract path geometry from callback geojson, and set duration of travel
+				var options = {
+					animation: 1,
+					path: data.routes[0].geometry.coordinates,
+					duration: duration
+				}
+
+
+				// start the soldier animation with above options, and remove the line when animation ends
+				soldier.followPath(
+					options,
+					function () {
+						tb.remove(line);
+					}
+				);
+
+				soldier.playAnimation(options);
+
+				// set up geometry for a line to be added to map, lofting it up a bit for *style*
+				var lineGeometry = options.path
+					.map(function (coordinate) {
+						return coordinate.concat([15])
+					})
+
+				// create and add line object
+				line = tb.line({
+					geometry: lineGeometry,
+					width: 5,
+					color: 'steelblue'
+				})
+
+				tb.add(line);
+
+				// set destination as the new origin, for the next trip
+				origin = destination;
+
+			})
+		}
+
+
     function createGeometry(doesCrossAntimeridian) {
       const geometry = [
         [139.6503, 35.6762, 0],
